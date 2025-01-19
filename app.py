@@ -1,14 +1,56 @@
 import gradio as gr
 import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
+import os
+from huggingface_hub import login
 
-# Load model and tokenizer from Hugging Face
+# Authenticate with Hugging Face
+def init_huggingface():
+    try:
+        # Get token from environment variable or use default
+        hf_token = os.getenv('HUGGINGFACE_TOKEN')
+        if hf_token:
+            login(hf_token)
+            print("Successfully logged in to Hugging Face")
+        else:
+            print("No Hugging Face token found, trying anonymous access")
+    except Exception as e:
+        print(f"Authentication error: {e}")
+
+# Load model and tokenizer
 def load_model():
-    model_name = "aayushraina/gpt2shakespeare"
-    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-    model = GPT2LMHeadModel.from_pretrained(model_name)
-    model.eval()
-    return model, tokenizer
+    try:
+        # Initialize Hugging Face authentication
+        init_huggingface()
+        
+        print("Loading model...")
+        # Try loading with auth token first
+        model = GPT2LMHeadModel.from_pretrained(
+            "aayushraina/gpt2shakespeare",
+            local_files_only=False,
+            trust_remote_code=True
+        )
+        print("Model loaded successfully!")
+        
+        print("Loading tokenizer...")
+        # Use the base GPT-2 tokenizer
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        print("Tokenizer loaded successfully!")
+        
+        model.eval()
+        return model, tokenizer
+    except Exception as e:
+        print(f"Error loading model or tokenizer: {e}")
+        try:
+            # Fallback to base GPT-2 if custom model fails
+            print("Attempting to load base GPT-2 model as fallback...")
+            model = GPT2LMHeadModel.from_pretrained("gpt2")
+            tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+            print("Fallback successful - loaded base GPT-2")
+            return model, tokenizer
+        except Exception as e:
+            print(f"Fallback failed: {e}")
+            return None, None
 
 # Text generation function
 def generate_text(prompt, max_length=500, temperature=0.8, top_k=40, top_p=0.9):
